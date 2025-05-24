@@ -77,9 +77,81 @@ ADD COLUMN Communities TEXT,
 ADD COLUMN Religion TEXT,
 ADD COLUMN Languages_Spoken TEXT
 
-------------------------------
-UPDATE therapist_profiles
-SET Name = initcap(split_part(name_header, '|', 1));
--- capitalized the first letter of the name and family name;
+----- EDITING name_header -----
 
+select name_header from  therapist_profiles
+
+UPDATE therapist_profiles
+SET 
+Name = initcap(split_part(name_header, '|', 1)),
+title = initcap(split_part(name_header, '|', 2)),
+credential = UPPER(split_part(name_header, '|', 3))
+
+--- Name, Title, Credential are updated
+select name, title, credential, name_header 
+from therapist_profiles limit 25
+
+
+----- EDITING location -----
+
+select location 
+from therapist_profiles limit 10
+
+UPDATE therapist_profiles
+SET 
+city = split_part(location, '|',1),
+state = UPPER(split_part(location, '|',2)),
+zip_code = split_part(location, '|',3),
+phone = split_part(location, '|',4),
+availability = split_part(location, '|',5);
+
+--- City, State, Zip_code, Availability, Phone are updated
+select city, state, zip_code, availability, phone, location 
+from therapist_profiles 
+limit 25
+
+select state, count(*) as total_therapists
+from therapist_profiles
+group by state
+order by total_therapists desc
+--- NY: 14462, TX: 14230, CA:13580 the top 3 counts
+
+
+----- EDITING sessions -----
+select sessions from therapist_profiles
+
+UPDATE therapist_profiles
+SET 
+individual_sessions = substring(sessions FROM '\$[0-9]+(?=,|$)'),
+couple_sessions = substring(sessions FROM '\$[0-9]+$');
+
+select individual_sessions, couple_sessions, sessions 
+from therapist_profiles
+where individual_sessions != couple_sessions
+limit 25
+
+--removing the $ sign
+UPDATE therapist_profiles
+SET 
+  individual_sessions = regexp_replace(individual_sessions, '\$', '', 'g'),
+  couple_sessions = regexp_replace(couple_sessions, '\$', '', 'g');
+
+
+ALTER TABLE therapist_profiles
+ALTER COLUMN individual_sessions TYPE INTEGER USING individual_sessions::INTEGER,
+ALTER COLUMN couple_sessions TYPE INTEGER USING couple_sessions::INTEGER;
+
+
+---Finding the max, mean and median of the sessions for the top 4 states with most rows
+SELECT 
+  state,
+  MAX(individual_sessions) AS max_individual_rate,
+  ROUND(AVG(individual_sessions),2) AS avg_individual_rate,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY individual_sessions) AS median_individual_rate, 
+  MAX(couple_sessions) AS max_couple_rate,
+  ROUND(AVG(couple_sessions),2) AS avg_couple_rate,
+  PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY couple_sessions) AS median_couple_sessions
+FROM therapist_profiles
+GROUP BY state
+having state in ('TX', 'CA', 'FL', 'NY');
 
